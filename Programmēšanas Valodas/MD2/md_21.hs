@@ -182,24 +182,22 @@ aa2 = do
   -}
 
 -- bb1 testa vārdnīca 1
-bb1d1 :: Dictionary String String
-bb1d1 = [("chocolate", "confectionery"), 
-          ("cookie", "confectionery"), 
-          ("apple", "fruit"), 
-          ("carrot", "vegetable"), 
-          ("cheese", "dairy"), 
-          ("banana", "fruit"), 
-          ("milk", "dairy"), 
-          ("broccoli", "vegetable")]
+bb1d1 :: Dictionary Int Int
+bb1d1 = [(45, 50), 
+          (49, 50), 
+          (60, 60), 
+          (74, 70), 
+          (68, 70), 
+          (12, 10)]
 
 -- bb1 testa vārdnīca 2
-bb1d2 :: Dictionary String String
-bb1d2 = [("confectionery", "unhealthy"), 
-          ("confectionery", "sweet"), 
-          ("fruit", "healthy"), 
-          ("fruit", "sweet"), 
-          ("vegetable", "healthy"), 
-          ("dairy", "calcium-rich")]
+bb1d2 :: Dictionary Int Int
+bb1d2 = [(10, 1), 
+          (20, 2), 
+          (50, 5), 
+          (60, 6), 
+          (70, 7), 
+          (80, 8)]
 
 -- bb1 tests
 bb1 :: IO ()
@@ -208,10 +206,7 @@ bb1 = do
   print (bb bb1d1 bb1d2)
   {- 
     Sagaidāmā izvade:
-    [("chocolate","unhealthy"),("chocolate","sweet"),("cookie","unhealthy"),
-    ("cookie","sweet"),("apple","healthy"),("apple","sweet"),("carrot","healthy"),
-    ("cheese","calcium-rich"),("banana","healthy"),("banana","sweet"),
-    ("milk","calcium-rich"),("broccoli","healthy")]
+    [(45,5),(49,5),(60,6),(74,7),(68,7),(12,1)]
   -}
 
 -- bb2 testa vārdnīca 1

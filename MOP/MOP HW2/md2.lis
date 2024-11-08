@@ -1,0 +1,183 @@
+ARM GAS  md2.s 			page 1
+
+
+   1              	    # Text segments
+   2              	    .text
+   3              	    # Izlīdzināt uz 4 baitu robežas
+   4              	    .align 2
+   5              	    # Norāda simbolus, kuri būs globāli un pieejami izmantošanai
+   6              	    .global matmul
+   7              	
+   8              	/*
+   9              	Algoritma doma:
+  10              	    Rēķināšana notiek ar otrādāku secību, līdz ar to katrs cikls
+  11              	    tiek pārbaidīts uzreiz ar padotajām vērtībām pret 0, tās pēc
+  12              	    vajadzības atjaunojot no steka.
+  13              	
+  14              	    M3 vērtības tiks rakstītas no beigām uz sākumu, katru reizi
+  15              	    adresi nobīdot par -4.
+  16              	
+  17              	    Pati funkcija sastāv no 3 cikliem: 
+  18              	    1) iet caur visām rindām m1
+  19              	    2) iet cauri visām kolonnām m2
+  20              	    3) iet cauri visām rindas vērtībām no m1 un kolonnas vērtībām
+  21              	    no m2 un veic aprēķinus
+  22              	
+  23              	    Nepieciešamās adreses M1 un M2 tiek iegūtas šādi:
+  24              	    m1: new_add = original_add + ((remaining_rows*w1)-1)*4
+  25              	    m2: new_add = original_add(((h2-1) * w2) + remaining_cols - 1)
+  26              	
+  27              	    3. ciklā pēc katras iterācijas m1 tiek bīdīts par -4 un m2 par
+  28              	    konkrētu soli, kas tiek sākumā aprēķināts: w2 * 4
+  29              	 */
+  30              	
+  31              	/*
+  32              	Kam lietoti reģistri:
+  33              	    R0:     h1
+  34              	    R1:     w1
+  35              	    R2:     m1 adrese
+  36              	    R3:     h2
+  37              	    R4:     w2
+  38              	    R5:     m2 adrese
+  39              	    R6:     m3 adrese
+  40              	    R7:     Pagaidu starpvērtības aprēķiniem, m3 vērtības
+  41              	    R8:     Vērtību no m1
+  42              	    R9:     Vērtību no m2
+  43              	    R10:    Adreses nobīde m2, staigājot pa kolonnu
+  44              	 */
+  45              	
+  46              	# Bloks, kas tiek izsaukts no C koda
+  47              	# int matmul( int h1, int w1, int *m1, int h2, int w2, int *m2, int *m3 );
+  48              	matmul:
+  49              	    @ Ieliek stekā oriģinālās r4-r10 reģistru vērtības
+  50              	    @ Tiek ieliktas arī r2 un r3 vērtības, kuras būs nepieciešamas aprēķiniem
+  51 0000 04202DE5 	    push    {r2}
+  52 0004 04302DE5 	    push    {r3}
+  53 0008 04402DE5 	    push    {r4}
+  54 000c 04502DE5 	    push    {r5}
+  55 0010 04602DE5 	    push    {r6}
+  56 0014 04702DE5 	    push    {r7}
+  57 0018 04802DE5 	    push    {r8}
+ARM GAS  md2.s 			page 2
+
+
+  58 001c 04902DE5 	    push    {r9}
+  59 0020 04A02DE5 	    push    {r10}
+  60              	    /*
+  61              	    Steka nobīdes:
+  62              	    R2      #32
+  63              	    R3      #28
+  64              	    R4(OG)  #24
+  65              	    R5(OG)  #20
+  66              	    R6(OG)  #16
+  67              	    R7(OG)  #12
+  68              	    R8(OG)  #8
+  69              	    R9(OG)  #4
+  70              	    R10(OG) #0
+  71              	     */
+  72 0024 24409DE5 	    ldr     r4, [sp, #36] @ w2
+  73 0028 28509DE5 	    ldr     r5, [sp, #40] @ m2 adr
+  74 002c 2C609DE5 	    ldr     r6, [sp, #44] @ m3 adr
+  75              	
+  76              	    @ pārbauda, vai w1 sakrit ar h1
+  77 0030 030051E1 	    cmp     r1, r3 
+  78 0034 2700001A 	    bne     error
+  79              	    
+  80              	    @ Iegūst gala adresi m3:
+  81 0038 900407E0 	    mul     r7, r0, r4
+  82 003c 017047E2 	    sub     r7, #1
+  83 0040 0771A0E1 	    lsl     r7, #2
+  84 0044 076086E0 	    add     r6, r6, r7 @ gala adrese m3
+  85              	
+  86              	    @ Adreses nobīde m2 aprēķiniem:
+  87 0048 04A1A0E1 	    lsl     r10, r4, #2 @ w2 * 4
+  88              	
+  89              	    @ Aprēķinu sākums:
+  90 004c FFFFFFEA 	    b       loopRow
+  91              	
+  92              	# Cikls ies cauri m1 rindām
+  93              	loopRow:    
+  94 0050 000050E3 	    cmp     r0, #0 @ atlikušās rindas m1 ar 0
+  95 0054 000000CA 	    bgt     loopCols
+  96 0058 200000EA 	    b       result
+  97              	
+  98              	# Cikls ies cauri m2 kolonnām
+  99              	loopCols:
+ 100              	    @ Ielādē sākotnējo m1 adresi
+ 101 005c 20209DE5 	    ldr     r2, [sp, #32]
+ 102              	    @ m1 sakotneja adrese tiek pabidita:
+ 103              	    @ new add = original add + (((remaining rows)*w1)-1)*4
+ 104 0060 900107E0 	    mul     r7, r0, r1 @ atlikušās kolonnas * w1
+ 105 0064 017047E2 	    sub     r7, #1  @ atņem 1, jo 1. sākas ar #0 nevis #4
+ 106 0068 0771A0E1 	    lsl     r7, #2 @ *4
+ 107 006c 072082E0 	    add     r2, r2, r7 @ pieskaita pie oriģinālās m1 adreses
+ 108              	
+ 109              	    @ Ielādē sākotnējo m2 adresi
+ 110 0070 28509DE5 	    ldr     r5, [sp, #40]
+ 111              	    @ m2 sakotneja adrese tiek pabidita
+ 112              	    @ new add = original add(((h2-1) * w2) + remaining cols - 1)
+ 113 0074 013043E2 	    sub     r3, r3, #1 @ h2 - 1
+ 114 0078 24709DE5 	    ldr     r7, [sp, #36] @ ielādē oriģinālo w2
+ARM GAS  md2.s 			page 3
+
+
+ 115 007c 930707E0 	    mul     r7, r3, r7 @ reizina h2-1 ar w2
+ 116 0080 047087E0 	    add     r7, r7, r4 @ pieskaita atlikušo kolonnu skaitu
+ 117 0084 017047E2 	    sub     r7, #1 @ atņem 1, jo 1. sākas ar #0 nevis #4
+ 118 0088 0771A0E1 	    lsl     r7, #2 @ *4
+ 119 008c 075085E0 	    add     r5, r5, r7 @ pieskaita pie oriģinālās m2 adreses
+ 120              	    
+ 121              	    @ Atjauno iepriekšējo r3
+ 122 0090 013083E2 	    add     r3, r3, #1
+ 123              	
+ 124              	    @ reģistrs, kurā rēkinas atbildes
+ 125 0094 0070A0E3 	    mov     r7, #0 
+ 126              	
+ 127 0098 000054E3 	    cmp     r4, #0 @ atlikušās kolonnas m2 ar 0
+ 128 009c 020000CA 	    bgt     loopCalc
+ 129 00a0 010040E2 	    sub     r0, #1
+ 130 00a4 24409DE5 	    ldr     r4, [sp, #36]
+ 131 00a8 E8FFFFEA 	    b       loopRow
+ 132              	
+ 133              	# Cikls rēķinās vienu vērtību
+ 134              	loopCalc:
+ 135 00ac 000053E3 	    cmp     r3, #0 @ w1 ar 0
+ 136 00b0 030000CA 	    bgt     calc
+ 137 00b4 047006E4 	    str     r7, [r6], #-4
+ 138 00b8 014044E2 	    sub     r4, #1
+ 139 00bc 1C309DE5 	    ldr     r3, [sp, #28] @ r3 OG vertiba
+ 140 00c0 E5FFFFEA 	    b       loopCols
+ 141              	
+ 142              	# Vērtības aprēķina bloks
+ 143              	calc:    
+ 144 00c4 048012E4 	    ldr     r8, [r2], #-4 @ vertiba no matrix1
+ 145 00c8 0A9015E6 	    ldr     r9, [r5], -r10 @ vertiba no matrix2
+ 146 00cc 987927E0 	    mla     r7, r8, r9, r7 @ sareizina un pieskaita klāt elementa summai
+ 147 00d0 013043E2 	    sub     r3, #1
+ 148 00d4 F4FFFFEA 	    b       loopCalc
+ 149              	
+ 150              	# Kļūdas bloks
+ 151              	error:
+ 152 00d8 0100A0E3 	    mov     r0, #1
+ 153 00dc FFFFFFEA 	    b       result
+ 154              	
+ 155              	# Rezultāta bloks
+ 156              	result:
+ 157              	    @ Atjauno oriģinālās vērtības lietotiem reģistriem
+ 158 00e0 04A09DE4 	    pop     {r10}
+ 159 00e4 04909DE4 	    pop     {r9}
+ 160 00e8 04809DE4 	    pop     {r8}
+ 161 00ec 04709DE4 	    pop     {r7}
+ 162 00f0 04609DE4 	    pop     {r6}
+ 163 00f4 04509DE4 	    pop     {r5}
+ 164 00f8 04409DE4 	    pop     {r4}
+ 165              	    @ Steka nobīdīšana uz sākumu
+ 166 00fc 04109DE4 	    pop     {r1} @ par iepušoto r3
+ 167 0100 04109DE4 	    pop     {r1} @ par iepušoto r2
+ 168 0104 04209DE4 	    pop     {r2} @ par atlikušajiem 3 funkcijas argumentiem
+ 169 0108 04209DE4 	    pop     {r2}
+ 170 010c 04209DE4 	    pop     {r2}
+ 171 0110 1EFF2FE1 	    bx      lr
+ARM GAS  md2.s 			page 4
+
+

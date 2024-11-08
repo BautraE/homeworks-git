@@ -1,0 +1,47 @@
+ARM GAS  md1.s 			page 1
+
+
+   1              	    # Text segments
+   2              	    .text
+   3              	    # Izlīdzināt uz 4 baitu robežas
+   4              	    .align 2
+   5              	    # Norāda simbolus, kuri būs globāli un pieejami izmantošanai
+   6              	    .global asum
+   7              	
+   8              	/* Apraksts:
+   9              	   Lai iegūtu aritmētiskās progresijas summu, izmanto padoto vērtību
+  10              	   r0 reģistrā un skaitot kopā rezultātu reģistrā r2. Skaitīšana notiek
+  11              	   dilstošā formātā (no lielākā skaitļa līdz mazākajam). */
+  12              	
+  13              	# Bloks, kas tiek izsaukts no C koda
+  14              	asum:
+  15              	    # Iestata r2 reģistra sākotnējo vērtību
+  16 0000 0020A0E3 	    mov     r2, #0
+  17 0004 000050E3 	    cmp     r0, #0
+  18 0008 0300008A 	    bhi     loop
+  19 000c 080000DA 	    ble     error
+  20              	
+  21              	# Condition bloks, kas pārbauda, vai ir vēl ko skaitīt klāt
+  22              	cond:
+  23 0010 000050E3 	    cmp     r0, #0
+  24 0014 0000008A 	    bhi     loop
+  25 0018 0300000A 	    beq     result
+  26              	
+  27              	/* Cikla bloks, kur pie progresijas summas pieskaita
+  28              	 nākamo vērtību un samazina iterāciju skaitu par 1 */
+  29              	loop:
+  30              	    # Veicot saskaitīšanu, skatās vai nav overflow
+  31 001c 002092E0 	    adds    r2, r0
+  32 0020 0300006A 	    bvs     error
+  33 0024 010040E2 	    sub     r0, #1
+  34 0028 F8FFFFEA 	    b       cond
+  35              	
+  36              	# Rezultāta bloks, kas atgriež atbildi
+  37              	result:
+  38 002c 0200A0E1 	    mov     r0, r2
+  39 0030 1EFF2FE1 	    bx      lr
+  40              	
+  41              	# Kļūdu bloks, kas atgriež kļūdas kodu "0"
+  42              	error:
+  43 0034 0000A0E3 	    mov     r0, #0
+  44 0038 1EFF2FE1 	    bx      lr
